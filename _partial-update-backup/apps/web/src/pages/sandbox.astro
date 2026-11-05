@@ -1,0 +1,271 @@
+---
+import Base from "../layouts/Base.astro";
+import Sandbox from "../components/sandbox/Sandbox.tsx";
+import { href } from "../lib/url";
+---
+
+<Base
+  title="Sandbox | System Design Quest"
+  description="Build any design from load balancers, servers, caches, queues and rate limiters, run it in the simulator, and share it by link or as scenario YAML."
+>
+  <section class="wrap page">
+    <h1 class="title">Sandbox</h1>
+    <p class="lede">
+      Build any design from the simulator's parts, send traffic through it and watch where it breaks. No goals and no grading: it's the same engine
+      the lessons use, with every setting open.
+    </p>
+    <p class="quiet">
+      New to the parts? The <a href={href("/learn/")}>course</a> introduces each one with a simulation of its own.
+    </p>
+    <Sandbox client:load />
+  </section>
+</Base>
+
+<style>
+  .page {
+    padding-top: 48px;
+  }
+  .title {
+    font-stretch: 125%;
+    font-weight: 800;
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+  }
+  .lede {
+    margin: 14px 0 8px;
+    max-width: 62ch;
+  }
+  :global(.sandbox) {
+    display: grid;
+    gap: 20px;
+    margin-top: 24px;
+    max-width: 900px;
+  }
+  :global(.sb-panel) {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-m);
+    padding: 16px 18px;
+    display: grid;
+    gap: 12px;
+    justify-items: start;
+    min-width: 0;
+  }
+  :global(.sb-panel > *) {
+    margin: 0;
+    max-width: 100%;
+  }
+  :global(.sb-panel h2) {
+    font-size: 1.2rem;
+    font-stretch: 112%;
+  }
+  :global(.sb-panel h3) {
+    font-size: 1.05rem;
+  }
+  :global(.sb-panel h4) {
+    font-size: 0.95rem;
+    margin-top: 6px;
+  }
+  :global(.sb-small) {
+    font-size: 0.9rem;
+    margin: 0;
+  }
+  :global(.sb-small:empty) {
+    display: none;
+  }
+  :global(.sb-notice) {
+    font-weight: 600;
+  }
+  :global(.sb-presets) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 10px;
+  }
+  :global(.sb-presets li) {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  :global(.sb-presets .quiet) {
+    font-size: 0.9rem;
+    flex: 1 1 240px;
+  }
+  :global(.sb-field) {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+  :global(.sb-field > label) {
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+  :global(.sb-toggle > label) {
+    font-weight: 500;
+    font-size: 0.95rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  :global(.sb-hint) {
+    font-size: 0.8rem;
+  }
+  :global(.sb-hint:empty) {
+    display: none;
+  }
+  :global(.sb-input) {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  :global(.sandbox input[type="number"]),
+  :global(.sandbox input[type="text"]),
+  :global(.sandbox select),
+  :global(.sb-yaml) {
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 6px 8px;
+    border-radius: var(--radius-s);
+    border: 1.5px solid var(--rule);
+    background: var(--panel);
+    color: var(--ink);
+    min-width: 0;
+  }
+  :global(.sandbox input[type="number"]) {
+    width: 7.5em;
+    font-variant-numeric: tabular-nums;
+  }
+  :global(.sb-title),
+  :global(.sb-title input) {
+    width: min(100%, 420px);
+  }
+  :global(.sb-fields) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+    gap: 12px 18px;
+    width: 100%;
+    align-items: start;
+  }
+  :global(.sb-pair) {
+    display: grid;
+    gap: 8px;
+    justify-items: start;
+  }
+  :global(.sb-nodes) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  :global(.sb-node) {
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    display: grid;
+    gap: 2px;
+    padding: 8px 10px;
+    border-radius: var(--radius-s);
+    border: 1.5px solid var(--rule);
+    background: var(--panel-2);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  :global(.sb-node .quiet) {
+    font-size: 0.84rem;
+  }
+  :global(.sb-node.on) {
+    border-color: var(--cobalt);
+    box-shadow: inset 4px 0 0 var(--cobalt);
+  }
+  :global(.sb-add) {
+    display: flex;
+    gap: 10px;
+    align-items: end;
+    flex-wrap: wrap;
+  }
+  :global(.sb-editor) {
+    width: 100%;
+    border-top: 2px solid var(--ink);
+    padding-top: 12px;
+    display: grid;
+    gap: 12px;
+    justify-items: start;
+  }
+  :global(.sb-editor > *) {
+    margin: 0;
+    max-width: 100%;
+  }
+  :global(.sb-rename) {
+    display: grid;
+    gap: 4px;
+  }
+  :global(.sb-edges),
+  :global(.sb-steps) {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 8px;
+    width: 100%;
+  }
+  :global(.sb-edges li) {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  :global(.sb-steps li) {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+    flex-wrap: wrap;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+  }
+  :global(.sb-client) {
+    width: 100%;
+  }
+  :global(.sb-client summary) {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  :global(.sb-problems) {
+    width: 100%;
+  }
+  :global(.sb-problems p) {
+    margin: 0 0 6px;
+  }
+  :global(.sb-errors),
+  :global(.sb-warnings) {
+    margin: 0;
+    padding-left: 1.2em;
+    display: grid;
+    gap: 6px;
+  }
+  :global(.sb-errors li::marker) {
+    color: var(--red);
+  }
+  :global(.sb-warnings) {
+    margin-top: 8px;
+  }
+  :global(.sb-warnings li::marker) {
+    color: var(--amber);
+  }
+  :global(.sb-share) {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  :global(.sb-yaml) {
+    width: 100%;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    white-space: pre;
+    overflow: auto;
+  }
+</style>

@@ -1,0 +1,30 @@
+---
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import Base from "../../layouts/Base.astro";
+import BossFight from "../../components/boss/BossFight.tsx";
+import { parseChallengeYaml } from "@sdq/schema";
+import { href } from "../../lib/url";
+
+const challenge = parseChallengeYaml(readFileSync(resolve(process.cwd(), "../../content/challenges/cache-flush.yaml"), "utf8"), "cache-flush.yaml");
+---
+
+<Base title={`Boss: ${challenge.title} | System Design Quest`} description="Module 6 boss fight: keep a cached shop online when a deploy empties the cache at the evening peak.">
+  <article class="wrap" style="padding-top:40px">
+    <nav class="quiet" aria-label="Breadcrumb" style="font-size:0.88rem;margin-bottom:18px">
+      <a href={href("/learn/")}>Course</a> / Module 6 boss
+    </nav>
+    <h1 class="boss-title">{challenge.title}</h1>
+    <p class="quiet" style="margin:10px 0 28px">Boss fight, Module 6. About 20 minutes. Your design is graded on its worst run.</p>
+    <BossFight client:load challenge={challenge} />
+  </article>
+</Base>
+
+<style>
+  .boss-title {
+    font-stretch: 125%;
+    font-weight: 800;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    max-width: 20ch;
+  }
+</style>

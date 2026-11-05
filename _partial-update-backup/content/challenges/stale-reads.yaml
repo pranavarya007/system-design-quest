@@ -1,0 +1,110 @@
+schema: 1
+id: stale-reads
+title: Keep prices fast and fresh
+boss: storage
+brief: >-
+  Picture a marketplace whose listing pages show a price and how many are left. Everything runs on one database
+  machine, and at the evening peak it can't keep up: pages time out. Sellers change prices and stock all day, and a
+  buyer who sees an old price or a sold-out item as available opens a support ticket. Your job: keep listing pages
+  fast (under 0.3 s even in the worst second) and the prices on them fresh through the evening peak, within the
+  budget.
+
+clarify:
+  prompt: Pick the 3 questions you'd ask first. You'll get answers only to the ones you pick.
+  pick: 3
+  questions:
+    - { id: mix, text: "How much traffic is there at the peak, and how much of it is writes?", useful: true, reveals: "About 1,200 requests a second from 10 seconds in. 1 in 20 is a seller changing a listing; the rest are buyers reading." }
+    - { id: fresh, text: "How out of date may a listing page be?", useful: true, reveals: "Hardly at all: at most 1 read in 100 may show a price or stock level older than the latest change." }
+    - { id: lag, text: "If we add read replicas, how far behind the primary will they run?", useful: true, reveals: "About 150 ms: a replica applies each change about 150 ms after the primary does." }
+    - { id: hot, text: "Are some listings much busier than others?", useful: true, reveals: "Yes. A few popular listings get most of the views, and their sellers also change them most often." }
+    - { id: engine, text: "Is it Postgres or MySQL?", useful: false, reveals: "Postgres. Both offer read replicas and synchronous replication, so it doesn't change the design." }
+    - { id: font, text: "Which font do the listing pages use?", useful: false, reveals: "Not relevant to the database." }
+
+commit:
+  prompt: Commit to your estimates before you build. The builder starts from your numbers.
+  fields:
+    - id: reads
+      label: Reads a second at the peak
+      answer: 1140
+      working: "1,200 requests a second, and 19 in 20 are reads: 1,200 x 0.95 = 1,140."
+    - id: workers
+      label: Replica workers needed at about 60% busy (each read takes about 10 ms of work)
+      answer: 19
+      working: "Each worker finishes about 1 / 0.01 = 100 reads a second, so 1,140 reads need about 11.4 busy workers. At 60% busy that's 11.4 / 0.6 = 19 workers."
+    - id: write_ms
+      label: "Milliseconds a write takes if it waits for the replicas (synchronous replication)"
+      answer: 160
+      working: "The usual 10 ms of work plus the 150 ms the replicas take to apply it: about 160 ms. Reads get faster and fresher; writes get slower."
+
+build:
+  topology: db
+  duration: 60s
+  seed: 5
+  traffic:
+    - [0s, 300]
+    - [10s, 1200]
+  keys: { space: 10000, zipf: 1, write_ratio: 0.05 }
+  replication_lag: 150ms
+  primary: { min: 1, max: 8, default: 8, label: Primary workers }
+  servers: { min: 0, max: 8, default: 0, label: Read replicas }
+  workers: { min: 1, max: 8, default: 4, label: Workers per replica }
+  server_card:
+    title: Database machines
+    help: >-
+      The primary takes every write. Replicas copy its data and serve reads; with no replicas, the primary serves
+      reads too. One machine has at most 8 workers. Each worker costs 0.5/h and does about 100 reads or writes a
+      second.
+  service_ms: { p50: 8, p99: 40 }
+  queue: 200
+  health_check: 2s
+  cost_per_worker_hour: 0.5
+  lb_label: Database router
+  slots:
+    - id: sync_replication
+      label: Synchronous replication
+      help: >-
+        The primary confirms a write only once the replicas have it. No read ever shows old data, but every write
+        waits about 150 ms longer.
+      cost_per_hour: 0
+      knobs: []
+  ignores: >-
+    The app servers and network in front of the database, and caching (the simulator's cache can't sit in front of a
+    primary, because it would answer writes). Replication lag is a fixed 150 ms; in a real database it grows when a
+    replica is busy. Applying writes costs the replicas nothing here, a primary failure and failover aren't modelled,
+    and synchronous replication's other cost, writes stalling when a replica is down, is left out. Reads and writes
+    cost the same work.
+
+goal:
+  worst_p99_ms: 300
+  error_rate: 0.01
+  stale_read_rate: 0.01
+  cost_per_hour: 20
+  stars:
+    - { cost_per_hour: 15 }
+    - { cost_per_hour: 13 }
+
+curveball:
+  text: "At 30 seconds a listing goes viral: traffic jumps by half for 15 seconds, writes included. Your design also runs twice more with 15% more traffic."
+  surge_at: 30s
+  surge_until: 45s
+  surge_scale: 1.5
+  variants:
+    - { seed: 51, rps_scale: 1.15 }
+    - { seed: 52, rps_scale: 1.15 }
+
+defend:
+  prompt: "In 3 to 5 sentences: why did one database fall over, how did you fix the load, and how did you keep reads fresh?"
+  rubric:
+    - "Names the bottleneck: one machine can't serve 1,200 requests a second, and reads are 95% of them."
+    - "Adds read replicas to spread the reads, sized with headroom for the viral spike."
+    - "Explains why replicas serve stale data: they apply each write about 150 ms late, and popular listings are read during that gap."
+    - "Chooses synchronous replication (or another way to read fresh data) and names its cost: slower writes."
+    - "Keeps the primary big enough for the writes, because replicas can't take writes."
+  pass: 3
+  model_answer: >-
+    One machine tops out at 8 workers, about 800 requests a second, and the peak is 1,200, so it queues and fails.
+    Reads are 95% of the traffic, so I added read replicas: about 19 workers' worth at 60% busy, with room for the
+    viral spike. But replicas run 150 ms behind, and the popular listings are both changed and read the most, so on
+    their own replicas show about 1 read in 7 an old price. Synchronous replication fixes that by confirming a write
+    only once the replicas have it; the cost is that writes take about 160 ms instead of 10, which sellers can live
+    with. Replicas can't take writes, so I kept a few workers on the primary rather than shrinking it to one.

@@ -1,0 +1,167 @@
+---
+import Base from "../layouts/Base.astro";
+import Certificates from "../components/certificate/Certificates.tsx";
+import { certificateRequirements } from "../lib/certificateReqs";
+import { href } from "../lib/url";
+const acts = certificateRequirements();
+---
+
+<Base
+  title="Certificates | System Design Quest"
+  description="See what you've finished in each act of the course, and download a certificate for every act you complete. Self-reported progress, not an accredited credential."
+>
+  <section class="wrap page">
+    <h1 class="title">Certificates</h1>
+    <p class="lede">
+      Finish an act and you can download a certificate for it: pass every lesson check in the act, solve its classic problems, and win its boss
+      fight if it has one. Finish every act for the course certificate.
+    </p>
+    <div class="callout honest">
+      <p>
+        <strong>What a certificate means.</strong> It shows progress you recorded yourself on a free course. It isn't an accredited credential, and
+        nobody checks it: progress lives in this browser, so a different browser or a cleared one starts from zero. A lesson check counts as passed
+        when you get at least two thirds of it right.
+      </p>
+    </div>
+    <Certificates client:load acts={acts} />
+    <p class="quiet" style="margin-top:32px">
+      Want to practise without a lesson? Build any design in the <a href={href("/sandbox/")}>sandbox</a>. Back to <a href={href("/learn/")}>the course</a>.
+    </p>
+  </section>
+</Base>
+
+<style>
+  .page {
+    padding-top: 48px;
+  }
+  .title {
+    font-stretch: 125%;
+    font-weight: 800;
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+  }
+  .lede {
+    margin-top: 14px;
+    max-width: 62ch;
+  }
+  .honest {
+    max-width: 760px;
+  }
+  .honest p {
+    margin: 0;
+  }
+  :global(.certs) {
+    display: grid;
+    gap: 20px;
+    max-width: 760px;
+    margin-top: 20px;
+  }
+  :global(.cert-card) {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-m);
+    padding: 18px 20px;
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+  }
+  :global(.cert-card > *) {
+    margin: 0;
+  }
+  :global(.cert-card h2) {
+    font-size: 1.25rem;
+    font-stretch: 112%;
+  }
+  :global(.cert-head) {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  :global(.cert-badge) {
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: var(--mint);
+    border: 1px solid var(--mint);
+    border-radius: 999px;
+    padding: 1px 10px;
+  }
+  :global(.cert-meter) {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+  }
+  :global(.cert-meter .meter) {
+    flex: 1;
+  }
+  :global(.cert-meter .num) {
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  :global(.cert-module) {
+    width: 100%;
+    border-top: 1px solid var(--rule);
+    padding-top: 8px;
+  }
+  :global(.cert-module summary) {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-weight: 600;
+  }
+  :global(.cert-count) {
+    font-weight: 500;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  :global(.cert-count.ok) {
+    color: var(--mint);
+    font-weight: 650;
+  }
+  :global(.cert-items) {
+    list-style: none;
+    padding: 6px 0 4px;
+    margin: 0;
+    display: grid;
+    gap: 6px;
+  }
+  :global(.cert-items li) {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  :global(.cert-items .quiet) {
+    font-size: 0.88rem;
+  }
+  :global(.cert-mark) {
+    width: 1.2em;
+    color: var(--ink-3);
+  }
+  :global(.cert-items li.ok .cert-mark) {
+    color: var(--mint);
+  }
+  :global(.cert-name) {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+  }
+  :global(.cert-name input) {
+    font: inherit;
+    padding: 8px 10px;
+    border-radius: var(--radius-s);
+    border: 1.5px solid var(--rule);
+    background: var(--panel);
+    color: var(--ink);
+    width: 100%;
+    max-width: 420px;
+  }
+  :global(.cert-status:empty) {
+    display: none;
+  }
+  :global(.cert-status) {
+    margin: 0;
+    font-weight: 600;
+  }
+</style>

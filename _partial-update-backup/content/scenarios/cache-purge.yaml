@@ -1,0 +1,62 @@
+# yaml-language-server: $schema=./scenario.schema.json
+schema: 1
+title: A deploy that flushes the cache
+seed: 7
+duration: 50s
+
+nodes:
+  - { id: cache, kind: cache, hit_ms: 1, capacity: unbounded, ttl: 10m, label: Cache }
+  - { id: db, kind: server, workers: 10, queue: 200, service_ms: { mean: 40 }, cost_per_worker_hour: 1, label: Database }
+
+edges:
+  - [cache, db]
+
+traffic:
+  rps:
+    - [0s, 400]
+    - [15s, 2000]
+  keys: { space: 5000, zipf: 1 }
+
+events:
+  - { at: 30s, purge: cache }
+
+controls:
+  - { node: cache, param: coalesce, label: "Coalesce misses: one fetch per key, others wait for it" }
+  - { node: db, param: workers, range: [4, 32], label: Database workers }
+
+predict:
+  ask: "2,000 reads a second, and the cache answers about 95% of them, so the database is under half busy. At 30 s a deploy flushes the whole cache. What happens?"
+  options:
+    - { id: a, text: "A blip of a second or so: the database has more than twice the capacity it is using." }
+    - { id: b, text: "Misses jump more than tenfold at once. The database's queue fills, requests are rejected and p99 nears a second, for about 10 seconds while the cache refills." }
+    - { id: c, text: "Nothing you'd notice: the popular keys are back in the cache within milliseconds." }
+  answer: b
+  explain: >-
+    Just before the flush, under 100 reads a second miss, which the database handles easily. In the second after it, about
+    1,100 miss: every key is cold, including the popular ones, and the database can finish about 250 a second. Its
+    queue fills and the excess is rejected. The popular keys do come back fast, but the long tail of less popular
+    keys keeps missing for seconds, so errors last until about 40 s. The steady load told you nothing about what a
+    flush costs.
+
+fix_prompt: >-
+  Get errors under 1% over the run. More database workers cost 1 an hour each, and most of the time they sit idle.
+  Does coalescing misses help? For 2 stars keep the cost at 18 or less; for 3, at 16 or less.
+
+goal:
+  error_rate: 0.01
+  stars:
+    - { cost_per_hour: 18 }
+    - { cost_per_hour: 16 }
+
+ignores: >-
+  How to avoid the flush in the first place (versioned keys, warming a new cache before it takes traffic, or
+  flushing a slice at a time): the engine can only empty the whole cache at once. Every read here is for data that
+  exists; writes, memory per key and the cost of the deploy itself are left out. The cache starts empty with quiet
+  traffic so it can warm up before the rush at 15 seconds.
+
+narrate:
+  - { at: 0s, text: "The cache warms up on 400 reads a second." }
+  - { at: 15s, text: "The rush: 2,000 reads a second. The database is busy for a few seconds while the cache fills." }
+  - { at: 25s, text: "About 95% of reads hit now, and the database is under half busy." }
+  - { at: 30s, text: "A deploy flushes the cache. Every key is cold, and the misses all go to the database at once." }
+  - { at: 33s, text: "The popular keys are back, but the long tail keeps missing while the database's queue is full." }

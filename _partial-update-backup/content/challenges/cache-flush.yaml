@@ -1,0 +1,109 @@
+schema: 1
+id: cache-flush
+title: Survive the cache flush
+boss: caching
+brief: >-
+  Picture a shop whose product pages each need a slow database query, about 50 ms, so a cache sits in front of the
+  database. Every evening about 2,000 page views a second arrive, and a few popular products get most of them. Last
+  week a routine deploy restarted the cache at the peak, and the site went down for minutes while the database
+  drowned in queries. Design the cache and the database behind it so the next deploy can't do that: pages must load
+  in under 0.8 s even in the worst second, within the budget.
+
+clarify:
+  prompt: Pick the 3 questions you'd ask first. You'll get answers only to the ones you pick.
+  pick: 3
+  questions:
+    - { id: peak, text: "How much traffic is there at the peak, and how skewed is it?", useful: true, reveals: "About 2,000 page views a second from 10 seconds in, over 2,000 products. The most popular product alone gets about 1 view in 8." }
+    - { id: flush, text: "What exactly happened to the cache during the deploy?", useful: true, reveals: "The deploy restarted the cache at the peak, so it came back empty and every request missed at once." }
+    - { id: fresh, text: "How out of date may a product page be?", useful: true, reveals: "Up to 10 seconds, because stock levels are on the page. Any TTL from 5 to 10 seconds is fine." }
+    - { id: query, text: "How long does the database take to build a page?", useful: true, reveals: "About 50 ms on average, and up to 200 ms for the slowest 1%. One database worker builds about 20 pages a second." }
+    - { id: lang, text: "Which cache product is it, Redis or Memcached?", useful: false, reveals: "Redis. Either would behave the same way here." }
+    - { id: logo, text: "Is the logo changing in this deploy?", useful: false, reveals: "No. Not relevant." }
+
+commit:
+  prompt: Commit to your estimates before you build. The builder starts from your numbers.
+  fields:
+    - id: no_cache
+      label: Database workers needed with no cache at all (each page takes about 50 ms)
+      answer: 100
+      working: "One worker builds about 1 / 0.05 = 20 pages a second, so 2,000 a second needs about 100 busy workers. That's far over budget: the cache isn't optional."
+    - id: workers
+      label: "Database workers needed if the cache answers 90% of views, at about 60% busy"
+      answer: 17
+      working: "10% of 2,000 is 200 misses a second. At 20 a second per worker that's 10 busy workers, and 10 / 0.6 is about 17. A flush sends far more than 200 a second for a few seconds, so this is the floor, not the answer."
+
+build:
+  duration: 60s
+  seed: 3
+  traffic:
+    - [0s, 300]
+    - [10s, 2000]
+  keys: { space: 2000, zipf: 1 }
+  servers: { min: 1, max: 6, default: 2, label: Database servers }
+  workers: { min: 1, max: 16, default: 4, label: Workers per database server }
+  server_card:
+    title: Database servers behind the cache
+    help: Each worker costs 0.5/h and builds about 20 product pages a second.
+  service_ms: { p50: 40, p99: 200 }
+  queue: 200
+  health_check: 2s
+  cost_per_worker_hour: 0.5
+  node_label: Database
+  lb_label: Database router
+  slots:
+    - id: cache
+      label: Cache in front of the database
+      help: >-
+        Keeps built pages in memory so repeat views skip the database. A bigger cache costs more. When it's full, the
+        eviction policy picks which page to throw out.
+      cost_per_hour: 1
+      knobs:
+        - { param: capacity, label: Pages the cache holds, range: [200, 2000], step: 100, default: 500, cost_per_unit: 0.004 }
+        - param: eviction
+          label: When full, throw out
+          default: lru
+          options:
+            - { value: lru, label: The page used least recently (LRU) }
+            - { value: lfu, label: The page used least often (LFU) }
+            - { value: random, label: Any page at random }
+        - { param: ttl, label: Seconds before a cached page expires, range: [5, 10], step: 1, default: 5 }
+        - { param: ttl_jitter, label: "Spread expiry times by up to this share of the TTL", range: [0, 0.5], step: 0.1, default: 0 }
+        - { param: coalesce, label: "Coalesce misses (one database query per page; other requests wait for it)", default: false }
+  ignores: >-
+    Writes and invalidation (prices never change during the run), memory per page (every page takes the same room),
+    network time, and warming the cache before traffic returns. The cache itself never saturates. A real cache
+    restart takes a moment; here it empties instantly and keeps serving.
+
+goal:
+  worst_p99_ms: 800
+  error_rate: 0.01
+  cost_per_hour: 18
+  stars:
+    - { cost_per_hour: 17 }
+    - { cost_per_hour: 16 }
+
+curveball:
+  text: "At 30 seconds a deploy restarts the cache: it comes back empty at the peak. Your design also runs twice more with 20% more traffic."
+  purge_cache_at: 30s
+  variants:
+    - { seed: 31, rps_scale: 1.2 }
+    - { seed: 32, rps_scale: 1.2 }
+
+defend:
+  prompt: "In 3 to 5 sentences: what happens when the cache comes back empty, and which parts of your design stop it taking the site down?"
+  rubric:
+    - "Explains the stampede: every request misses at once, and many of them ask for the same popular pages."
+    - "Uses coalescing so each missing page costs one database query, not hundreds."
+    - "Sizes the database for the refill burst after the flush, not just the normal miss rate."
+    - "Sizes the cache and picks an eviction policy that keeps the popular pages, and says what that buys (fewer misses, a smaller database)."
+    - "Is honest about TTL jitter: it stops pages cached at the same moment from expiring together, but it can't soften the flush itself."
+  pass: 3
+  model_answer: >-
+    When the cache restarts empty at the peak, every view misses, and the popular pages are asked for hundreds of
+    times while their first query is still running, so the database is flooded with copies of the same work.
+    Coalescing makes each missing page cost one query while the other requests wait for it. Even so, refilling the
+    popular pages is a burst of real work, so the database needs headroom well above the normal miss rate. A cache that
+    holds the hot set, with LFU so one-off views don't push out the popular pages, keeps the normal miss rate
+    low and the database small: here 500 of the 2,000 pages answer about 3 views in 4. I'd use the longest TTL the
+    10-second freshness rule allows. TTL jitter spreads out pages cached at the same moment, which is exactly what a
+    flush creates, but the flush itself is the worst second, so in this run jitter makes little difference.
